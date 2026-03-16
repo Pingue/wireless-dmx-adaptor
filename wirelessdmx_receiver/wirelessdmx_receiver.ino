@@ -46,6 +46,18 @@ uint16_t artnetUniverse = 0;
 unsigned long frameCount = 0;
 unsigned long lastFrameTime = 0;
 unsigned long allPacketsCount = 0;  // Count all ArtNet packets, even wrong universe
+unsigned long lastPollReplyAnnounce = 0;
+const unsigned long POLL_REPLY_ANNOUNCE_INTERVAL = 5000;
+
+IPAddress getSubnetBroadcastIp() {
+  IPAddress ip = WiFi.localIP();
+  IPAddress mask = WiFi.subnetMask();
+  IPAddress broadcast;
+  for (int i = 0; i < 4; i++) {
+    broadcast[i] = (uint8_t)(ip[i] | (~mask[i]));
+  }
+  return broadcast;
+}
 
 void sendArtPollReply(IPAddress targetIp) {
   uint8_t reply[239];
@@ -107,6 +119,11 @@ void sendArtPollReply(IPAddress targetIp) {
   pollReplyUdp.beginPacket(targetIp, 6454);
   pollReplyUdp.write(reply, sizeof(reply));
   pollReplyUdp.endPacket();
+}
+
+void announceArtPollReply() {
+  sendArtPollReply(IPAddress(255, 255, 255, 255));
+  sendArtPollReply(getSubnetBroadcastIp());
 }
 
 void saveConfig() {
@@ -332,6 +349,8 @@ void setup() {
   artnet.setArtDmxCallback(onDmxFrame);
   artnet.begin();
   pollReplyUdp.begin(0);
+  announceArtPollReply();
+  lastPollReplyAnnounce = millis();
   
   Serial.println("ArtNet receiver ready!");
   Serial.println("Listening on UDP port 6454 (ArtNet)");
@@ -343,6 +362,12 @@ void loop() {
   uint16_t opcode = artnet.read(); // Check for incoming Art-Net packets
   if (opcode == ART_POLL) {
     sendArtPollReply(artnet.getSenderIp());
+    Serial.printf("[DISCOVERY] Replied to ArtPoll from %s\n", artnet.getSenderIp().toString().c_str());
+  }
+
+  if (millis() - lastPollReplyAnnounce >= POLL_REPLY_ANNOUNCE_INTERVAL) {
+    lastPollReplyAnnounce = millis();
+    announceArtPollReply();
   }
   
   // Print status every 30 seconds if no data received
