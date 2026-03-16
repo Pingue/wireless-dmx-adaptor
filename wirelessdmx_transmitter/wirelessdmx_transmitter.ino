@@ -190,7 +190,6 @@ void loop() {
     
     // Check for break condition (indicated by framing error)
     if (Serial.hasRxError()) {
-      Serial.clearRxError();
       inFrame = true;
       channelIndex = -1;
       continue;
@@ -220,14 +219,15 @@ void loop() {
     lastDmxUpdate = now;
     
     // Parse target IP address
+    artnet.setUniverse(artnetUniverse);
+    artnet.setLength(512);
+    memcpy(artnet.getDmxFrame(), dmxData, 512);
     IPAddress targetAddr;
     if (targetAddr.fromString(targetIP)) {
-      artnet.setArtDmxData(dmxData, 512);
-      artnet.sendDmxPacket(targetAddr, artnetUniverse);
+      artnet.write(targetAddr);
     } else {
       // Default to broadcast if IP parsing fails
-      artnet.setArtDmxData(dmxData, 512);
-      artnet.sendDmxPacket(IPAddress(255, 255, 255, 255), artnetUniverse);
+      artnet.write(IPAddress(255, 255, 255, 255));
     }
   }
 }
