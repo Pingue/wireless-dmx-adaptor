@@ -45,18 +45,6 @@ uint16_t artnetUniverse = 0;
 uint8_t dmxData[512];
 unsigned long lastDmxUpdate = 0;
 const unsigned long DMX_UPDATE_INTERVAL = 30; // Send ArtNet every 30ms (~33Hz)
-unsigned long lastPollReplyAnnounce = 0;
-const unsigned long POLL_REPLY_ANNOUNCE_INTERVAL = 5000;
-
-IPAddress getSubnetBroadcastIp() {
-  IPAddress ip = WiFi.localIP();
-  IPAddress mask = WiFi.subnetMask();
-  IPAddress broadcast;
-  for (int i = 0; i < 4; i++) {
-    broadcast[i] = (uint8_t)(ip[i] | (~mask[i]));
-  }
-  return broadcast;
-}
 
 void sendArtPollReply(IPAddress targetIp) {
   uint8_t reply[239];
@@ -118,11 +106,6 @@ void sendArtPollReply(IPAddress targetIp) {
   pollReplyUdp.beginPacket(targetIp, 6454);
   pollReplyUdp.write(reply, sizeof(reply));
   pollReplyUdp.endPacket();
-}
-
-void announceArtPollReply() {
-  sendArtPollReply(IPAddress(255, 255, 255, 255));
-  sendArtPollReply(getSubnetBroadcastIp());
 }
 
 void saveConfig() {
@@ -257,8 +240,6 @@ void setup() {
   // Initialize ArtNet
   artnet.begin();
   pollReplyUdp.begin(0);
-  announceArtPollReply();
-  lastPollReplyAnnounce = millis();
 }
 
 void loop() {
@@ -266,10 +247,6 @@ void loop() {
   uint16_t opcode = artnet.read();
   if (opcode == ART_POLL) {
     sendArtPollReply(artnet.getSenderIp());
-  }
-  if (millis() - lastPollReplyAnnounce >= POLL_REPLY_ANNOUNCE_INTERVAL) {
-    lastPollReplyAnnounce = millis();
-    announceArtPollReply();
   }
   
   // Read DMX data from Serial (hardware UART)
