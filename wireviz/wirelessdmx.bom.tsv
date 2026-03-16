@@ -1,0 +1,12 @@
+Id	Description	Qty	Unit	Designators
+1	Cable, DMX, 5 x 0.25 mm² shielded	0	m	5 Pin XLR Receive, 5 Pin XLR Send
+2	Connector, 5 Pin Adaptor, female, 5 pins	1		5 Pin Adaptor Output
+3	Connector, 5 Pin Adaptor, male, 5 pins	1		5 Pin Adaptor Input
+4	Connector, DMX, female, 5 pins	1		desk
+5	Connector, Misc, male, 5 pins	1		fixture
+6	Connector, NodeMCU, 4 pins	2		ESP Receive, ESP Send
+7	Connector, TTL to RS-485 Module, 8 pins	2		RS-485 Adaptor Receive, RS-485 Adaptor Send
+8	Wire, 0.25 mm², BK	0	m	ESP Wiring Receive, ESP Wiring Send, Internal Wiring Receive, Internal Wiring Send
+9	Wire, 0.25 mm², RD	0	m	ESP Wiring Receive, ESP Wiring Send, Internal Wiring Receive, Internal Wiring Send
+10	Wire, 0.25 mm², WH	0	m	ESP Wiring Receive, ESP Wiring Send, Internal Wiring Receive, Internal Wiring Send
+11	Wire, 0.25 mm², YE	0	m	ESP Wiring Receive, ESP Wiring Send

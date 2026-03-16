@@ -1,0 +1,122 @@
+connectors:
+  desk:
+    type: DMX
+    subtype: female
+    pinlabels: [GND, DATA1-, DATA1+, DATA2-, DATA2+]
+    image:
+      src: desk.jpg
+
+  5 Pin Adaptor Input:
+    type: 5 Pin Adaptor
+    subtype: male
+    pinlabels: [GND, DATA1-, DATA1+, DATA2-, DATA2+]
+    image:
+      src: 5pinmale.jpg
+
+  RS-485 Adaptor Send:
+    type: TTL to RS-485 Module
+    pinlabels: [DI, DE, RE, RO, VCC, B, A, GND]
+    image:
+      src: rs485.jpg
+   
+  ESP Send:
+    type: NodeMCU
+    pinlabels: [GND, 3V3, D1, D0]
+    image:
+      src: nodemcu.jpg
+
+#####
+
+  fixture:
+    type: Misc
+    subtype: male
+    pinlabels: [GND, DATA1-, DATA1+, DATA2-, DATA2+]
+    image:
+      src: fixture.jpg
+
+  5 Pin Adaptor Output:
+    type: 5 Pin Adaptor
+    subtype: female
+    pinlabels: [GND, DATA1-, DATA1+, DATA2-, DATA2+]
+    image:
+      src: 5pinfemale.jpg
+
+  ESP Receive:
+    type: NodeMCU
+    pinlabels: [GND, 3V3, D1, D4]
+    image:
+      src: nodemcu.jpg
+
+  RS-485 Adaptor Receive:
+    type: TTL to RS-485 Module
+    pinlabels: [DI, DE, RE, RO, VCC, B, A, GND]
+    image:
+      src: rs485.jpg
+   
+    
+cables:
+  5 Pin XLR Send:
+    wirecount: 5 # need to specify number of wires explicitly when using a color code
+    gauge: 0.25 mm2 # also accepts AWG as unit
+    shield: true
+    type: DMX
+
+  Internal Wiring Send:
+    category: bundle
+    colors: [RD, BK, WH, YE, GN, BU]
+    wirecount: 3
+    gauge: 0.25 mm2 # also accepts AWG as unit
+
+  ESP Wiring Send:
+    category: bundle
+    colors: [RD, BK, WH, YE, GN, BU]
+    wirecount: 4 # need to specify number of wires explicitly when using a color code
+    gauge: 0.25 mm2 # also accepts AWG as unit
+  
+#########
+
+  5 Pin XLR Receive:
+    wirecount: 5 # need to specify number of wires explicitly when using a color code
+    gauge: 0.25 mm2 # also accepts AWG as unit
+    shield: true
+    type: DMX
+
+  Internal Wiring Receive:
+    category: bundle
+    colors: [RD, BK, WH, YE, GN, BU]
+    wirecount: 3
+    gauge: 0.25 mm2 # also accepts AWG as unit
+  
+  ESP Wiring Receive:
+    category: bundle
+    colors: [RD, BK, WH, YE, GN, BU]
+    wirecount: 4 # need to specify number of wires explicitly when using a color code
+    gauge: 0.25 mm2 # also accepts AWG as unit
+  
+
+connections:
+  -
+    - desk: [1-5]
+    - 5 Pin XLR Send: [1-5]
+    - 5 Pin Adaptor Input: [1-5]
+  -
+    - 5 Pin Adaptor Input: [1-3]
+    - Internal Wiring Send: [1-3]
+    - RS-485 Adaptor Send: [8, 6, 7]
+  -
+    - RS-485 Adaptor Send: [2, 3, 1, 5, 8]
+    - ESP Wiring Send: [1, 1, 2, 3, 4]
+    - ESP Send: [3, 3, 4, 2, 1]
+###########
+  -
+    - ESP Receive: [3, 3, 4, 1, 2]
+    - ESP Wiring Receive: [1, 1, 2, 3, 4]
+    - RS-485 Adaptor Receive: [2, 3, 1, 8, 5]
+  -
+    - RS-485 Adaptor Receive: [8, 6, 7]
+    - Internal Wiring Receive: [1-3]
+    - 5 Pin Adaptor Output: [1-3]
+  -
+    - 5 Pin Adaptor Output: [1-5]
+    - 5 Pin XLR Receive: [1-5]
+    - fixture: [1-5]
