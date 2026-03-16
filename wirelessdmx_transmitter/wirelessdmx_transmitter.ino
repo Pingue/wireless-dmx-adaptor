@@ -35,6 +35,7 @@
 
 WiFiManager wifiManager;
 ArtnetWifi artnet;
+WiFiUDP pollReplyUdp;
 
 char callbackUrl[CALLBACK_URL_MAX_LEN] = "";
 char targetIP[TARGET_IP_MAX_LEN] = "255.255.255.255"; // Default broadcast
@@ -44,6 +45,68 @@ uint16_t artnetUniverse = 0;
 uint8_t dmxData[512];
 unsigned long lastDmxUpdate = 0;
 const unsigned long DMX_UPDATE_INTERVAL = 30; // Send ArtNet every 30ms (~33Hz)
+
+void sendArtPollReply(IPAddress targetIp) {
+  uint8_t reply[239];
+  memset(reply, 0, sizeof(reply));
+
+  // Art-Net header + OpPollReply
+  memcpy(reply, "Art-Net\0", 8);
+  reply[8] = 0x00;
+  reply[9] = 0x21;
+
+  IPAddress localIp = WiFi.localIP();
+  reply[10] = localIp[0];
+  reply[11] = localIp[1];
+  reply[12] = localIp[2];
+  reply[13] = localIp[3];
+
+  // Art-Net UDP port 0x1936
+  reply[14] = 0x19;
+  reply[15] = 0x36;
+
+  // Firmware version
+  reply[16] = 0x01;
+  reply[17] = 0x00;
+
+  // Port-Address split into Net/Subnet/Universe
+  uint8_t net = (artnetUniverse >> 8) & 0x7F;
+  uint8_t sub = (artnetUniverse >> 4) & 0x0F;
+  uint8_t uni = artnetUniverse & 0x0F;
+  reply[18] = net;
+  reply[19] = sub;
+
+  // ESTA manufacturer code (unused here)
+  reply[24] = 0x00;
+  reply[25] = 0x00;
+
+  // Node names
+  strncpy((char*)&reply[26], "WirelessDMX TX", 17);
+  strncpy((char*)&reply[44], "Wireless DMX512 Transmitter", 63);
+  strncpy((char*)&reply[108], "OK", 63);
+
+  // One output port
+  reply[172] = 0x00;
+  reply[173] = 0x01;
+  reply[174] = 0x80;
+  reply[182] = 0x80;
+  reply[190] = uni;
+
+  // Node style: StNode
+  reply[200] = 0x00;
+
+  // Bind IP
+  reply[207] = localIp[0];
+  reply[208] = localIp[1];
+  reply[209] = localIp[2];
+  reply[210] = localIp[3];
+  reply[211] = 0x01;
+
+  // Reply directly to poll sender
+  pollReplyUdp.beginPacket(targetIp, 6454);
+  pollReplyUdp.write(reply, sizeof(reply));
+  pollReplyUdp.endPacket();
+}
 
 void saveConfig() {
   EEPROM.begin(EEPROM_SIZE);
@@ -176,10 +239,15 @@ void setup() {
   
   // Initialize ArtNet
   artnet.begin();
+  pollReplyUdp.begin(0);
 }
 
 void loop() {
   MDNS.update();
+  uint16_t opcode = artnet.read();
+  if (opcode == ART_POLL) {
+    sendArtPollReply(artnet.getSenderIp());
+  }
   
   // Read DMX data from Serial (hardware UART)
   static bool inFrame = false;
