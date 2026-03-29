@@ -78,4 +78,6 @@ Both devices use:
 
 See [LICENSE](LICENSE) for details.
 
+## AI DISCLAIMER
 
+This project was primarily AI vibe-coded without human review as it's outside my expertise and I had an event to run. I'm more than happy to accept reviews and contributions by people who know what they're doing more than me!
