@@ -27,6 +27,7 @@
 #define DMX_CHANNELS 512
 #define DMX_BREAK 100        // Break time in microseconds (88us min)
 #define DMX_MAB 12           // Mark After Break in microseconds (8us min)
+#define DMX_TX_INTERVAL_MS 25  // DMX output rate (~40Hz)
 
 // EEPROM addresses for configuration storage
 #define EEPROM_SIZE 512
@@ -43,9 +44,14 @@ byte dmxData[DMX_CHANNELS];
 char universeStr[6] = "0";
 uint16_t artnetUniverse = 0;
 
+WiFiManagerParameter customCallbackUrl("callback", "Callback URL", callbackUrl, CALLBACK_URL_MAX_LEN);
+WiFiManagerParameter customUniverse("universe", "ArtNet Universe (0-32767)", universeStr, 6);
+
 unsigned long frameCount = 0;
 unsigned long lastFrameTime = 0;
 unsigned long allPacketsCount = 0;  // Count all ArtNet packets, even wrong universe
+unsigned long lastDmxTxTime = 0;
+bool dmxOutputEnabled = false;
 
 void sendArtPollReply(IPAddress targetIp) {
   uint8_t reply[239];
@@ -176,6 +182,21 @@ void sendCallback() {
 }
 
 void saveConfigCallback() {
+  strncpy(callbackUrl, customCallbackUrl.getValue(), CALLBACK_URL_MAX_LEN - 1);
+  callbackUrl[CALLBACK_URL_MAX_LEN - 1] = '\0';
+
+  int configuredUniverse = atoi(customUniverse.getValue());
+  if (configuredUniverse < 0) {
+    configuredUniverse = 0;
+  }
+  if (configuredUniverse > 32767) {
+    configuredUniverse = 32767;
+  }
+  artnetUniverse = configuredUniverse;
+  snprintf(universeStr, sizeof(universeStr), "%d", artnetUniverse);
+
+  Serial.printf("[CONFIG] Updated from web portal: universe=%d\n", artnetUniverse);
+
   // Save configuration when WiFiManager saves config
   saveConfig();
 }
@@ -248,8 +269,8 @@ void onDmxFrame(uint16_t universe, uint16_t length, uint8_t sequence, uint8_t* d
     for (int i = 0; i < length && i < DMX_CHANNELS; i++) {
       dmxData[i] = data[i];
     }
-    // Send DMX data
-    sendDMX();
+    // Mark DMX output active; frame transmission happens in loop()
+    dmxOutputEnabled = true;
     
     digitalWrite(LED_PIN, HIGH);  // LED off (inverted)
   }
@@ -276,10 +297,6 @@ void setup() {
   
   // Load saved configuration from EEPROM
   loadConfig();
-  
-  // Create custom parameters for WiFi configuration portal
-  WiFiManagerParameter customCallbackUrl("callback", "Callback URL", callbackUrl, CALLBACK_URL_MAX_LEN);
-  WiFiManagerParameter customUniverse("universe", "ArtNet Universe (0-32767)", universeStr, 6);
   
   // WiFiManager will try to connect to saved credentials
   // If it fails, it starts a captive portal named "DMX_RX_Setup"
@@ -325,8 +342,15 @@ void setup() {
   
   // Start mDNS responder
   if (MDNS.begin("dmx-receiver")) {
+    MDNS.addService("http", "tcp", 80);
     MDNS.addService("artnet", "udp", 6454);
   }
+
+  // Keep WiFiManager web portal available while connected.
+  // This allows reconfiguration from the current network at http://<device-ip>/
+  wifiManager.setConfigPortalBlocking(false);
+  wifiManager.startWebPortal();
+  Serial.println("Config portal always on at http://<device-ip>/");
   
   // Initialize ArtNet
   artnet.setArtDmxCallback(onDmxFrame);
@@ -340,9 +364,30 @@ void setup() {
 
 void loop() {
   MDNS.update();
+  wifiManager.process();
   uint16_t opcode = artnet.read(); // Check for incoming Art-Net packets
   if (opcode == ART_POLL) {
     sendArtPollReply(artnet.getSenderIp());
+  }
+
+  // Send DMX continuously at a fixed output rate.
+  // Keep transmission out of the Art-Net callback to avoid blocking packet handling.
+  unsigned long now = millis();
+  if (dmxOutputEnabled && (now - lastDmxTxTime >= DMX_TX_INTERVAL_MS)) {
+    lastDmxTxTime = now;
+    sendDMX();
+  }
+  
+  // Print framerate stats every 10 seconds
+  static unsigned long lastFrameCountCheck = 0;
+  static unsigned long lastFrameCount = 0;
+  if (millis() - lastFrameCountCheck > 10000) {
+    unsigned long framesInPeriod = frameCount - lastFrameCount;
+    float framesPerSecond = framesInPeriod / 10.0;
+    Serial.printf("[STATS] %.2f frames/sec (received %lu in last 10s)\n", 
+                  framesPerSecond, framesInPeriod);
+    lastFrameCountCheck = millis();
+    lastFrameCount = frameCount;
   }
   
   // Print status every 30 seconds if no data received

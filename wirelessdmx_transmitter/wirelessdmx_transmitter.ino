@@ -42,6 +42,10 @@ char targetIP[TARGET_IP_MAX_LEN] = "255.255.255.255"; // Default broadcast
 char universeStr[6] = "0";
 uint16_t artnetUniverse = 0;
 
+WiFiManagerParameter customCallbackUrl("callback", "Callback URL", callbackUrl, CALLBACK_URL_MAX_LEN);
+WiFiManagerParameter customTargetIP("target", "Target IP (broadcast: 255.255.255.255)", targetIP, TARGET_IP_MAX_LEN);
+WiFiManagerParameter customUniverse("universe", "ArtNet Universe (0-32767)", universeStr, 6);
+
 uint8_t dmxData[512];
 unsigned long lastDmxUpdate = 0;
 const unsigned long DMX_UPDATE_INTERVAL = 30; // Send ArtNet every 30ms (~33Hz)
@@ -182,6 +186,25 @@ void sendCallback() {
 }
 
 void saveConfigCallback() {
+  strncpy(callbackUrl, customCallbackUrl.getValue(), CALLBACK_URL_MAX_LEN - 1);
+  callbackUrl[CALLBACK_URL_MAX_LEN - 1] = '\0';
+
+  strncpy(targetIP, customTargetIP.getValue(), TARGET_IP_MAX_LEN - 1);
+  targetIP[TARGET_IP_MAX_LEN - 1] = '\0';
+
+  int configuredUniverse = atoi(customUniverse.getValue());
+  if (configuredUniverse < 0) {
+    configuredUniverse = 0;
+  }
+  if (configuredUniverse > 32767) {
+    configuredUniverse = 32767;
+  }
+  artnetUniverse = configuredUniverse;
+  snprintf(universeStr, sizeof(universeStr), "%d", artnetUniverse);
+
+  Serial.println();
+  Serial.printf("[CONFIG] Updated from web portal: target=%s, universe=%d\n", targetIP, artnetUniverse);
+
   // Save configuration when WiFiManager saves config
   saveConfig();
 }
@@ -199,11 +222,6 @@ void setup() {
   
   // Load saved configuration from EEPROM
   loadConfig();
-  
-  // Create custom parameters for WiFi configuration portal
-  WiFiManagerParameter customCallbackUrl("callback", "Callback URL", callbackUrl, CALLBACK_URL_MAX_LEN);
-  WiFiManagerParameter customTargetIP("target", "Target IP (broadcast: 255.255.255.255)", targetIP, TARGET_IP_MAX_LEN);
-  WiFiManagerParameter customUniverse("universe", "ArtNet Universe (0-32767)", universeStr, 6);
   
   // WiFiManager will try to connect to saved credentials
   // If it fails, it starts a captive portal named "DMX_TX_Setup"
@@ -234,8 +252,15 @@ void setup() {
   
   // Start mDNS responder
   if (MDNS.begin("dmx-transmitter")) {
+    MDNS.addService("http", "tcp", 80);
     MDNS.addService("artnet", "udp", 6454);
   }
+
+  // Keep WiFiManager web portal available while connected.
+  // This allows reconfiguration from the current network at http://<device-ip>/
+  wifiManager.setConfigPortalBlocking(false);
+  wifiManager.startWebPortal();
+  Serial.println("Config portal always on at http://<device-ip>/");
   
   // Initialize ArtNet
   artnet.begin();
@@ -244,6 +269,7 @@ void setup() {
 
 void loop() {
   MDNS.update();
+  wifiManager.process();
   uint16_t opcode = artnet.read();
   if (opcode == ART_POLL) {
     sendArtPollReply(artnet.getSenderIp());
